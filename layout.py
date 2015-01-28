@@ -5,6 +5,9 @@ import socket
 import binascii
 import ssl
 import sqlite3
+import os
+import struct
+from socket import *
 from PyQt4 import QtGui
 
 #global varible
@@ -13,20 +16,25 @@ username=''
 order=[]
 spice=[]
 meta=[]
+tb=[]
 index=0
 page=0
 maxpage=0
-
+address="192.168.1.103"
 #end
 class qmain(QtGui.QMainWindow):    
     def __init__(self):
         super(qmain, self).__init__()
         self.login()
+        self.downloadsql()
         self.fetch_data()
         self.initUI(0)
     def initUI(self,p):  
         global index
         global page
+        global tb
+        for i in range(0,6):
+            tb.append(i)
         index=0
         j=0
         last=len(meta)/6-page*6
@@ -35,7 +43,7 @@ class qmain(QtGui.QMainWindow):
         self.move(0,0)
         self.setWindowTitle('canteen order system') 
         usr=QtGui.QLabel(username)
-        usr.move(150,0)
+        usr.move(0,0)
         usr.show()
         try:
             index=page*6+j
@@ -121,6 +129,10 @@ class qmain(QtGui.QMainWindow):
         else:
             btnext=QtGui.QPushButton('next',self)
             btnext.setDisabled(True)
+        table=QtGui.QComboBox()
+        table.itemData=tb
+        table.move(250,0)
+        table.show()        
         btprior.move(0,150)
         btprior.clicked.connect(self.buttonClicked7)      
         btnext.move(100,150)
@@ -133,7 +145,7 @@ class qmain(QtGui.QMainWindow):
         btsend.show()
         self.show()
     def fetch_data(self):
-        sconn=sqlite3.connect("sq.db")
+        sconn=sqlite3.connect("new_sq.db")
         sconn.text_factory = sqlite3.OptimizedUnicode
         su=sconn.cursor()
         su.execute("select * from name;")
@@ -158,8 +170,9 @@ class qmain(QtGui.QMainWindow):
             self.statusBar().showMessage('NO username input')
     def auth(self,n):
         try:
-            s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            s.connect(("192.168.1.101",22))
+            global address
+            s = socket(AF_INET,SOCK_STREAM)
+            s.connect((address,22))
             s.send("\xab\xcd")  
             print s.recv(1024)
             s.close()
@@ -167,10 +180,10 @@ class qmain(QtGui.QMainWindow):
         except:
             QtGui.QMessageBox.warning(self,'alert','connection error',QtGui.QMessageBox.Ok)
             print 'connection error!'        
-    def send(self,o,t,u):
+    def send(self,o,t,u): #o is order ,t is table ,u is username
         try:
-            s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            s.connect(("192.168.1.101",22))
+            s = socket(socket.AF_INET,socket.SOCK_STREAM)
+            s.connect((address,22))
             string=''
             for i in range(0,len(o)):
                 string+=order[i]
@@ -227,6 +240,40 @@ class qmain(QtGui.QMainWindow):
         global order
         print order
         self.send(order, 1, username)
+    def downloadsql(self):
+        try:
+            ADDR = (address,8000)
+            BUFSIZE = 1024
+            FILEINFO_SIZE=struct.calcsize('128s32sI8s')
+            conn = socket(AF_INET,SOCK_STREAM)
+            #socket.setdefaulttimeout(1000)
+            conn.connect(ADDR)
+            conn.send("\x00\x00")
+            fhead = conn.recv(FILEINFO_SIZE)
+            filename,temp1,filesize,temp2=struct.unpack('128s32sI8s',fhead)
+            print filename,len(filename),type(filename)
+            print filesize
+            filename = filename.strip('\00') #...
+            fp = open(filename,'wb')
+            restsize = filesize
+            print "starting receive... ",
+            while 1:
+                if restsize > BUFSIZE:
+                    filedata = conn.recv(BUFSIZE)
+                else:
+                    filedata = conn.recv(restsize)
+                if not filedata: 
+                    break
+                fp.write(filedata)
+                restsize = restsize-len(filedata)
+                if restsize == 0:
+                    break
+            print "finished..."
+            fp.close()
+            conn.close()
+            print "closed..."
+        except:
+            print "download error"
 def main():
     app = QtGui.QApplication(sys.argv)
     ex = qmain()
