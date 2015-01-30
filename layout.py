@@ -20,7 +20,10 @@ tb=[]
 index=0
 page=0
 maxpage=0
-address="192.168.1.103"
+price=[]
+address="192.168.1.105"
+cport=7000
+fport=8000
 #end
 class qmain(QtGui.QMainWindow):    
     def __init__(self):
@@ -41,43 +44,41 @@ class qmain(QtGui.QMainWindow):
         maxpage=len(meta)/6
         self.resize(320,240)
         self.move(0,0)
-        self.setWindowTitle('canteen order system') 
-        usr=QtGui.QLabel(username)
-        usr.move(0,0)
-        usr.show()
+        self.setWindowTitle('canteen order system'+'username:'+username) 
+        self.menuBar()
         try:
             index=page*6+j
-            bt1=QtGui.QPushButton(meta[index],self)
+            bt1=QtGui.QPushButton(meta[index]+" "+price[index],self)
             bt1.move(0,0)
             bt1.clicked.connect(self.buttonClicked1)
             bt1.show()
             j=j+1
             index=page*6+j
-            bt2=QtGui.QPushButton(meta[index],self)
+            bt2=QtGui.QPushButton(meta[index]+price[index],self)
             bt2.move(100,0)
             bt2.clicked.connect(self.buttonClicked2)
             bt2.show()
             j=j+1
             index=page*6+j
-            bt3=QtGui.QPushButton(meta[index],self)
+            bt3=QtGui.QPushButton(meta[index]+price[index],self)
             bt3.move(0,50)
             bt3.clicked.connect(self.buttonClicked3)
             bt3.show()
             j=j+1
             index=page*6+j
-            bt4=QtGui.QPushButton(meta[index],self)
+            bt4=QtGui.QPushButton(meta[index]+price[index],self)
             bt4.move(100,50)
             bt4.clicked.connect(self.buttonClicked4)
             bt4.show()
             j=j+1
             index=page*6+j
-            bt5=QtGui.QPushButton(meta[index],self)
+            bt5=QtGui.QPushButton(meta[index]+price[index],self)
             bt5.move(0,100)
             bt5.clicked.connect(self.buttonClicked5)
             bt5.show()
             j=j+1
             index=page*6+j     
-            bt6=QtGui.QPushButton(meta[index],self)
+            bt6=QtGui.QPushButton(meta[index]+price[index],self)
             bt6.move(100,100)
             bt6.clicked.connect(self.buttonClicked6)
             bt6.show()
@@ -144,16 +145,19 @@ class qmain(QtGui.QMainWindow):
         btnext.show()
         btsend.show()
         self.show()
-    def fetch_data(self):
+    def fetch_data(self): #read name and price from database
         sconn=sqlite3.connect("new_sq.db")
         sconn.text_factory = sqlite3.OptimizedUnicode
         su=sconn.cursor()
         su.execute("select * from name;")
         global meta
         global index
+        global price
         for r in su:
             assert type(r[0]) is str
+            #assert type(r[1]) is int
             meta.append(r[0])
+            price.append(r[1])
         index=0       
     def login(self):
         text, ok = QtGui.QInputDialog.getText(self, 'Input username','Enter your name:')
@@ -170,9 +174,10 @@ class qmain(QtGui.QMainWindow):
             self.statusBar().showMessage('NO username input')
     def auth(self,n):
         try:
+	    global cport
             global address
             s = socket(AF_INET,SOCK_STREAM)
-            s.connect((address,22))
+            s.connect((address,cport))
             s.send("\xab\xcd")  
             print s.recv(1024)
             s.close()
@@ -182,17 +187,27 @@ class qmain(QtGui.QMainWindow):
             print 'connection error!'        
     def send(self,o,t,u): #o is order ,t is table ,u is username
         try:
-            s = socket(socket.AF_INET,socket.SOCK_STREAM)
-            s.connect((address,22))
+	    global cport
+            s = socket(AF_INET,SOCK_STREAM)
+            s.connect((address,cport))
             string=''
             for i in range(0,len(o)):
-                string+=order[i]
+                string+=o[i]
                 string+=','
             print string
-            s.send(string)  
-            print s.recv(1024)
-            s.close()
-            QtGui.QMessageBox.information(self,'accept','commited',QtGui.QMessageBox.Ok)
+            ret = QtGui.QMessageBox.question(self, "commit",
+                                 "you are going to commit?",
+                                 QtGui.QMessageBox.Yes,
+                                 QtGui.QMessageBox.Cancel)
+            if ret == QtGui.QMessageBox.Yes:
+                for i in range(0,len(o)):
+                    order.pop()
+                s.send(string)  
+                print s.recv(1024)
+                s.close()
+                QtGui.QMessageBox.information(self,'accept','commited',QtGui.QMessageBox.Ok)
+            else :
+                return                 
         except:
             QtGui.QMessageBox.warning(self,'alert','connection error',QtGui.QMessageBox.Ok)
             print 'connection error!'
@@ -236,17 +251,17 @@ class qmain(QtGui.QMainWindow):
         if page<maxpage:
             page=page+1
         self.initUI(page)       
-    def buttonClicked9(self):
+    def buttonClicked9(self): # commit order
         global order
         print order
         self.send(order, 1, username)
-    def downloadsql(self):
+    def downloadsql(self): # download database from server
         try:
-            ADDR = (address,8000)
+            global fport
+            ADDR = (address,fport)
             BUFSIZE = 1024
             FILEINFO_SIZE=struct.calcsize('128s32sI8s')
             conn = socket(AF_INET,SOCK_STREAM)
-            #socket.setdefaulttimeout(1000)
             conn.connect(ADDR)
             conn.send("\x00\x00")
             fhead = conn.recv(FILEINFO_SIZE)
