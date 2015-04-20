@@ -21,7 +21,7 @@ index=0
 page=0
 maxpage=0
 price=[]
-address="192.168.1.105"
+address="172.21.199.2"
 cport=7000
 fport=8000
 #end
@@ -30,7 +30,7 @@ class qmain(QtGui.QMainWindow):
         super(qmain, self).__init__()
         self.login()
         self.downloadsql()
-        self.fetch_data()
+        self.fetch_data(1)
         self.initUI(0)
     def initUI(self,p):  
         global index
@@ -48,14 +48,21 @@ class qmain(QtGui.QMainWindow):
         self.menuBar()
         try:
             index=page*6+j
+	    tabhost=QtGui.QTabWidget(self)
+	    tabhost.resize(320,240)
+	    east=QtGui.QWidget()
+	    west=QtGui.QWidget()
+	    tabhost.addTab(east, "east")
+	    tabhost.addTab(west,"west")
+	    
             bt1=QtGui.QPushButton(meta[index]+" "+price[index],self)
-            bt1.move(0,0)
+            bt1.move(0,20)
             bt1.clicked.connect(self.buttonClicked1)
             bt1.show()
             j=j+1
             index=page*6+j
             bt2=QtGui.QPushButton(meta[index]+price[index],self)
-            bt2.move(100,0)
+            bt2.move(100,20)
             bt2.clicked.connect(self.buttonClicked2)
             bt2.show()
             j=j+1
@@ -82,6 +89,8 @@ class qmain(QtGui.QMainWindow):
             bt6.move(100,100)
             bt6.clicked.connect(self.buttonClicked6)
             bt6.show()
+	    
+	    tabhost.show()
         except:
             QtGui.QMessageBox.information(self,'information','last page',QtGui.QMessageBox.Ok)
             j=0
@@ -145,11 +154,15 @@ class qmain(QtGui.QMainWindow):
         btnext.show()
         btsend.show()
         self.show()
-    def fetch_data(self): #read name and price from database
+    def fetch_data(self,arg1): #read name and price from database
         sconn=sqlite3.connect("new_sq.db")
         sconn.text_factory = sqlite3.OptimizedUnicode
         su=sconn.cursor()
-        su.execute("select * from name;")
+	if arg1!=2:
+	    #print "select * from name where family='%d';"%(arg1)
+	    su.execute("select * from name where family=%d;"%(arg1))
+	else:
+	    print 'aa'
         global meta
         global index
         global price
@@ -202,7 +215,10 @@ class qmain(QtGui.QMainWindow):
             if ret == QtGui.QMessageBox.Yes:
                 for i in range(0,len(o)):
                     order.pop()
-                s.send(string)  
+                string+=t
+		string+=","
+		string+=u
+		s.send(string)  
                 print s.recv(1024)
                 s.close()
                 QtGui.QMessageBox.information(self,'accept','commited',QtGui.QMessageBox.Ok)
@@ -264,31 +280,32 @@ class qmain(QtGui.QMainWindow):
             conn = socket(AF_INET,SOCK_STREAM)
             conn.connect(ADDR)
             conn.send("\x00\x00")
-            fhead = conn.recv(FILEINFO_SIZE)
-            filename,temp1,filesize,temp2=struct.unpack('128s32sI8s',fhead)
-            print filename,len(filename),type(filename)
-            print filesize
-            filename = filename.strip('\00') #...
-            fp = open(filename,'wb')
-            restsize = filesize
-            print "starting receive... ",
-            while 1:
-                if restsize > BUFSIZE:
-                    filedata = conn.recv(BUFSIZE)
-                else:
-                    filedata = conn.recv(restsize)
-                if not filedata: 
-                    break
-                fp.write(filedata)
-                restsize = restsize-len(filedata)
-                if restsize == 0:
-                    break
+	    while 1:
+            	fhead = conn.recv(FILEINFO_SIZE)
+            	filename,temp1,filesize,temp2=struct.unpack('128s32sI8s',fhead)
+           	print filename,len(filename),type(filename)
+            	print filesize
+            	filename = filename.strip('\00')
+            	fp = open(filename,'wb')
+            	restsize = filesize
+            	print "starting receive... ",
+            	while 1:
+                	if restsize > BUFSIZE:
+                    		filedata = conn.recv(BUFSIZE)
+                	else:
+                    		filedata = conn.recv(restsize)
+                	if not filedata: 
+                    		break
+                	fp.write(filedata)
+                	restsize = restsize-len(filedata)
+                	if restsize == 0:
+                    		break
             print "finished..."
             fp.close()
             conn.close()
             print "closed..."
-        except:
-            print "download error"
+        except Exception,e:
+            print e
 def main():
     app = QtGui.QApplication(sys.argv)
     ex = qmain()
