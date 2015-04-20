@@ -3,6 +3,7 @@ import sys
 import time
 import thread
 import sqlite3
+import socket
 from socket import *
 import struct
 from PyQt4.QtGui import *  
@@ -11,14 +12,15 @@ from PyQt4 import QtGui
 from PyQt4.QtSql import *
 from SocketServer import TCPServer, BaseRequestHandler  
 import traceback 
+from fileinput import filename
 
 #global var
-ip="192.168.191.1"
+ip=gethostbyname(gethostname())
 recvSock = socket(AF_INET,SOCK_STREAM)
 BUFSIZE = 1024
 data =""
 FILEINFO_SIZE=struct.calcsize('128s32sI8s')
-
+orw=None
 #end
 
 class qmain(QtGui.QMainWindow):
@@ -119,10 +121,19 @@ class Model(QSqlTableModel):
         self.select() 
         self.setEditStrategy(QSqlTableModel.OnManualSubmit)
         
-#def updategui(self):
             
 class ormanage(QDialog):
     def __init__(self): 
+        QDialog.__init__(self) 
+        vbox=QVBoxLayout(self) 
+        self.setWindowTitle("order management")
+        self.view=QTableView() 
+        self.model=Model2(self.view)
+        
+        self.resize(640,480)
+        self.view.setModel(self.model) 
+        vbox.addWidget(self.view)
+    def updateui(self):
         QDialog.__init__(self) 
         vbox=QVBoxLayout(self) 
         self.setWindowTitle("order management")
@@ -138,7 +149,7 @@ class TestWidget(QDialog):
         vbox=QVBoxLayout(self) 
         self.view=QTableView() 
         self.model=Model(self.view) 
-        self.changeEvent(Model2.submit())
+        #self.changeEvent(Model2.submit())
         self.resize(640,480)
         self.view.setModel(self.model) 
         vbox.addWidget(self.view) 
@@ -160,8 +171,8 @@ def loaddata(self):
     w.exec_()   
 def loadorder(self):
     createConnection(self)
-    w=ormanage()
-    w.exec_()    
+    orw=ormanage()
+    orw.exec_()    
 class qsearch(QtGui.QMainWindow):
     def __init__(self):
         super(qsearch,self).__init__()
@@ -195,6 +206,7 @@ class MyBaseRequestHandlerr(BaseRequestHandler):
             
             sconn.close()
             #self.request.sendall("\x00")
+            loadorder(self)
             self.request.sendall(data.upper())  
         except:  
             traceback.print_exc()  
@@ -220,15 +232,22 @@ def transport(arg1):
         return 
     conn,addr = arg1
     print "client has connceted to > ",addr
-    filename='new_sq.db'
-    fhead=struct.pack('128s11I',filename,0,0,0,0,0,0,0,0,os.stat(filename).st_size,0,0)
-    conn.send(fhead)
-    fp = open(filename,'rb')
-    while 1:
-        filedata = fp.read(BUFSIZE)
-        if not filedata: 
-            break
-        conn.send(filedata)
+    #filename='new_sq.db'
+    #fhead=struct.pack('128s11I',filename,0,0,0,0,0,0,0,0,os.stat(filename).st_size,0,0)
+    #conn.send(fhead)
+    dirr=os.getcwd()
+    l=os.listdir(dirr)
+    for filename in l:
+        if filename!=sys.argv[0][sys.argv[0].rfind(os.sep)+1:]:
+            print filename
+            fhead=struct.pack('128s11I',filename,0,0,0,0,0,0,0,0,os.stat(filename).st_size,0,0)
+            conn.send(fhead)
+            fp = open(filename,'rb')
+            while 1:
+                filedata = fp.read(BUFSIZE)
+                if not filedata: 
+                    break
+                conn.send(filedata)
     print "transfer finished,drop conncetion"
     fp.close()
     #recvSock.close()
